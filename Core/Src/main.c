@@ -18,10 +18,10 @@
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
-#include "math.h"
+
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-
+#include "math.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -134,6 +134,7 @@ int main(void)
   int count = 0;
   int CalculatedFrequency = 0;
   /* USER CODE END 2 */
+
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   while (1)
@@ -304,7 +305,6 @@ static void MX_TIM2_Init(int frequency)
   HAL_TIM_MspPostInit(&htim2);
 
 }
-
 /**
   * @brief USART2 Initialization Function
   * @param None
