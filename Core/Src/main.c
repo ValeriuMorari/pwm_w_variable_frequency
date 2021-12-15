@@ -59,7 +59,7 @@ void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
 static void MX_USART2_UART_Init(void);
 static void MX_DMA_Init(void);
-static void MX_TIM2_Init(int frequency);
+static void MX_TIM2_Init(int frequency, int dead_time);
 /* USER CODE BEGIN PFP */
 
 /* USER CODE END PFP */
@@ -126,13 +126,14 @@ int main(void)
   MX_GPIO_Init();
   MX_USART2_UART_Init();
   MX_DMA_Init();
-  // MX_TIM2_Init();
+
   /* USER CODE BEGIN 2 */
   // HAL_UART_Receive_DMA(&huart2, rx_data, 100);
   int i = 0, j = 0;
   int len = 0;
   int count = 0;
   int CalculatedFrequency = 0;
+  int CalculatedDeadTime = -1;
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -170,14 +171,40 @@ int main(void)
 
 				  HAL_TIM_PWM_Stop(&htim2, TIM_CHANNEL_1);
 				  HAL_TIM_PWM_Stop(&htim2, TIM_CHANNEL_2);
-				  MX_TIM2_Init(CalculatedFrequency);
+				  MX_TIM2_Init(CalculatedFrequency, CalculatedDeadTime);
 				  HAL_TIM_PWM_Start(&htim2, TIM_CHANNEL_1);
 				  HAL_TIM_PWM_Start(&htim2, TIM_CHANNEL_2);
 				  HAL_UART_Transmit(&huart2, FrequencySetString, size(FrequencySetString), 100);
+				  for (i = 0; i < 15; i++)
+				  {
+					  numbers[i] = '\0';
+				  }
+				  break;
+			  }
+			  if (rx_buffer[i] == '=' && rx_buffer[i - 1] == 'd')
+			  {
+				  count = 0;
+				  for (j = i + 1; j < len; j++)
+				  {
+					  numbers[count] = rx_buffer[j];
+					  count++;
+				  }
+				  CalculatedDeadTime = chr_to_int(numbers, count - 1);
+
+				  HAL_TIM_PWM_Stop(&htim2, TIM_CHANNEL_1);
+				  HAL_TIM_PWM_Stop(&htim2, TIM_CHANNEL_2);
+				  MX_TIM2_Init(CalculatedFrequency, CalculatedDeadTime);
+				  HAL_TIM_PWM_Start(&htim2, TIM_CHANNEL_1);
+				  HAL_TIM_PWM_Start(&htim2, TIM_CHANNEL_2);
+				  HAL_UART_Transmit(&huart2, DeadTimeSetString, size(DeadTimeSetString), 100);
+				  for (i = 0; i < 15; i++)
+				  {
+					  numbers[i] = '\0';
+				  }
 				  break;
 			  }
 		  }
-			  // HAL_UART_Receive_DMA(&huart2, rx_data, 100);
+
 
 
 	  }
@@ -239,17 +266,19 @@ void SystemClock_Config(void)
   * @param None
   * @retval None
   */
-static void MX_TIM2_Init(int frequency)
+static void MX_TIM2_Init(int frequency, int dead_time)
 {
 
   /* USER CODE BEGIN TIM2_Init 0 */
   int period = 0;
-  int dead_time = 0;
+  // int dead_time = 0;
   int pulse_1 = 0;
   int pulse_2 = 0;
   period = (84000000 / frequency) / 2 - 1;
   pulse_1 = period / 2;
-  dead_time = period * 0.05;
+  if (dead_time == -1)
+	  dead_time = period * 0.05;
+
   pulse_2 = pulse_1 + dead_time;
   /* USER CODE END TIM2_Init 0 */
 
@@ -403,7 +432,7 @@ void EXTI15_10_IRQHandler(void)
   HAL_GPIO_TogglePin(GPIOA, GPIO_PIN_5);
   HAL_TIM_PWM_Stop(&htim2, TIM_CHANNEL_1);
   HAL_TIM_PWM_Stop(&htim2, TIM_CHANNEL_2);
-  MX_TIM2_Init(frequency);
+  MX_TIM2_Init(frequency, -1);
   frequency += 2000;
   HAL_TIM_PWM_Start(&htim2, TIM_CHANNEL_1);
   HAL_TIM_PWM_Start(&htim2, TIM_CHANNEL_2);
