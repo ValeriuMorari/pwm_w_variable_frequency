@@ -18,7 +18,7 @@
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
-#include "stm32f4xx_it.h"
+#include "math.h"
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 
@@ -35,6 +35,12 @@
 
 /* Private macro -------------------------------------------------------------*/
 /* USER CODE BEGIN PM */
+uint8_t tx_data[100];
+uint8_t FrequencySetString[100] = " frequency set";
+uint8_t DeadTimeSetString[100] = " dead time set";
+uint8_t rx_data[100];
+uint8_t rx_buffer[100];
+uint8_t numbers[15];
 
 /* USER CODE END PM */
 
@@ -42,6 +48,7 @@
 TIM_HandleTypeDef htim2;
 
 UART_HandleTypeDef huart2;
+DMA_HandleTypeDef hdma_usart2_rx;
 
 /* USER CODE BEGIN PV */
 
@@ -51,15 +58,42 @@ UART_HandleTypeDef huart2;
 void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
 static void MX_USART2_UART_Init(void);
+static void MX_DMA_Init(void);
 static void MX_TIM2_Init(int frequency);
-void EXTI15_10_IRQHandler(void);
 /* USER CODE BEGIN PFP */
 
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
+int size(uint8_t *s)
+{
+	int i = 0;
+	while (s[i] != '\0')
+	{
+		i++;
+	}
 
+	return i;
+}
+
+int chr_to_int(uint8_t *CharVector, int len)
+{
+	int i = 0;
+	int int_number = 0;
+	int final_number = 0;
+
+
+	for (i = 0; i <= len; i++)
+	{
+
+
+		int_number = (int)(CharVector[i] - '0');
+		final_number = int_number * pow(10, size(CharVector) - i - 1) + final_number;
+	}
+
+	return final_number;
+}
 /* USER CODE END 0 */
 
 /**
@@ -91,10 +125,15 @@ int main(void)
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
   MX_USART2_UART_Init();
-  MX_TIM2_Init(2000);
+  MX_DMA_Init();
+  // MX_TIM2_Init();
   /* USER CODE BEGIN 2 */
+  // HAL_UART_Receive_DMA(&huart2, rx_data, 100);
+  int i = 0, j = 0;
+  int len = 0;
+  int count = 0;
+  int CalculatedFrequency = 0;
   /* USER CODE END 2 */
-
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   while (1)
@@ -102,9 +141,53 @@ int main(void)
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
+	  HAL_UART_Receive(&huart2, rx_data, 99, 500);
+	  if (rx_data[0] != '\0')
+	  {
+		  len = size(rx_data);
+		  for (i = 0; i < len; i++)
+		  {
+			  rx_buffer[i] = rx_data[i];
+			  rx_data[i] = '\0';
+		  }
+		  for (i = len; i < 100; i++)
+		  {
+			  rx_buffer[i] = '\0';
+		  }
+
+		  for (i = 0; i < len; i++)
+		  {
+			  if (rx_buffer[i] == '=' && rx_buffer[i - 1] == 'f')
+			  {
+				  count = 0;
+				  for (j = i + 1; j < len; j++)
+				  {
+					  numbers[count] = rx_buffer[j];
+					  count++;
+				  }
+				  CalculatedFrequency = chr_to_int(numbers, count - 1);
+
+				  HAL_TIM_PWM_Stop(&htim2, TIM_CHANNEL_1);
+				  HAL_TIM_PWM_Stop(&htim2, TIM_CHANNEL_2);
+				  MX_TIM2_Init(CalculatedFrequency);
+				  HAL_TIM_PWM_Start(&htim2, TIM_CHANNEL_1);
+				  HAL_TIM_PWM_Start(&htim2, TIM_CHANNEL_2);
+				  HAL_UART_Transmit(&huart2, FrequencySetString, size(FrequencySetString), 100);
+				  break;
+			  }
+		  }
+			  // HAL_UART_Receive_DMA(&huart2, rx_data, 100);
+
+
+	  }
+
   }
-  /* USER CODE END 3 */
+
+	  // HAL_Delay(2000);
+
 }
+  /* USER CODE END 3 */
+
 
 /**
   * @brief System Clock Configuration
@@ -204,7 +287,7 @@ static void MX_TIM2_Init(int frequency)
   sConfigOC.OCMode = TIM_OCMODE_PWM1;
   sConfigOC.Pulse = pulse_1;
   sConfigOC.OCPolarity = TIM_OCPOLARITY_HIGH;
-  sConfigOC.OCFastMode = TIM_OCFAST_DISABLE;
+  sConfigOC.OCFastMode = TIM_OCFAST_ENABLE;
   if (HAL_TIM_PWM_ConfigChannel(&htim2, &sConfigOC, TIM_CHANNEL_1) != HAL_OK)
   {
     Error_Handler();
@@ -256,6 +339,22 @@ static void MX_USART2_UART_Init(void)
 }
 
 /**
+  * Enable DMA controller clock
+  */
+static void MX_DMA_Init(void)
+{
+
+  /* DMA controller clock enable */
+  __HAL_RCC_DMA1_CLK_ENABLE();
+
+  /* DMA interrupt init */
+  /* DMA1_Stream5_IRQn interrupt configuration */
+  HAL_NVIC_SetPriority(DMA1_Stream5_IRQn, 0, 0);
+  HAL_NVIC_EnableIRQ(DMA1_Stream5_IRQn);
+
+}
+
+/**
   * @brief GPIO Initialization Function
   * @param None
   * @retval None
@@ -293,6 +392,7 @@ static void MX_GPIO_Init(void)
 }
 
 /* USER CODE BEGIN 4 */
+
 /**
   * @brief This function handles EXTI line[15:10] interrupts.
   */
